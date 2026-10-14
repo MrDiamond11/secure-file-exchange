@@ -1,0 +1,8 @@
+{
+  "platform": {
+    "apiRuntime": "python:3.11"
+  },
+  "globalHeaders": {
+    "X-Content-Type-Options": "nosniff"
+  }
+}

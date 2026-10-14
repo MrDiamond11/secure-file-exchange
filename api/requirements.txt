@@ -1,0 +1,7 @@
+azure-functions
+azure-identity
+azure-keyvault-secrets
+azure-cosmos
+pgpy==0.6.0
+# PGPy 0.6.0 usa TripleDES desde cryptography.primitives, que se elimina en la 48.
+cryptography<48

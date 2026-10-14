@@ -1,0 +1,14 @@
+# Material criptográfico: nunca al repositorio
+*.asc
+
+# Terraform: el estado contiene secretos (claves de Cosmos DB, token de despliegue...)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+
+# Python y entornos locales
+__pycache__/
+.venv/
+.python_packages/
+local.settings.json

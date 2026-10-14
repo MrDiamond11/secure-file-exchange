@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Secure File Exchange</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; max-width: 42rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; }
+    code { background: rgba(127,127,127,.18); padding: .1rem .3rem; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Secure File Exchange</h1>
+  <p>API de intercambio de ficheros con PGP. El cliente cifra el fichero con la clave pública del servidor y lo firma con su clave privada; el servidor verifica la firma, lo guarda cifrado y devuelve una confirmación firmada por él y cifrada para el cliente.</p>
+  <p>Endpoint: <code>POST /api/upload</code>. Se usa con el script <code>client/client.py</code> del repositorio.</p>
+</body>
+</html>
