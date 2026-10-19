@@ -33,7 +33,7 @@ def main():
         headers={"Content-Type": "text/plain", "X-Filename": path.name},
         timeout=60,
     )
-    if response.status_code != 200:
+    if response.status_code not in (200, 422):
         sys.exit(f"El servidor respondió {response.status_code}: {response.text}")
 
     # La confirmación llega cifrada para nosotros y firmada por el servidor.
@@ -44,9 +44,13 @@ def main():
     if info.get("sha256") != hashlib.sha256(data).hexdigest():
         sys.exit("La confirmación no corresponde al fichero enviado (hash distinto)")
 
-    print("Confirmación válida, firmada por el servidor:")
-    print(json.dumps(info, indent=2))
+    recibido = info.get("status") == "RECEIVED"
+    print("Confirmación válida, firmada por el servidor:" if recibido
+          else "FICHERO RECHAZADO. Confirmación válida, firmada por el servidor:")
+    print(json.dumps(info, indent=2, ensure_ascii=False))
     print(f"Guardada tal como llegó (cifrada) en {confirmation_file}")
+    if not recibido:
+        sys.exit(2)
 
 
 if __name__ == "__main__":

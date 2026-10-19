@@ -17,7 +17,7 @@ from azure.cosmos import CosmosClient
 from azure.identity import ClientSecretCredential
 from azure.keyvault.secrets import SecretClient
 
-from ..shared_code import pgp_server
+from ..shared_code import pgp_server, rules
 
 # Un documento de Cosmos DB admite 2 MB como máximo, y el mensaje PGP en ASCII
 # ocupa más que el fichero original.
@@ -75,19 +75,38 @@ def main(req: func.HttpRequest) -> func.HttpResponse:
     receipt_id = str(uuid.uuid4())
 
     try:
-        content, confirmation = pgp_server.process_upload(
-            armored,
-            _secret("pgp-server-private-key"),
-            _secret("pgp-server-passphrase"),
-            _secret("pgp-client-public-key"),
-            receipt_id=receipt_id,
+        server_priv = _secret("pgp-server-private-key")
+        passphrase = _secret("pgp-server-passphrase")
+        client_pub = _secret("pgp-client-public-key")
+
+        # Si esto falla, el remitente no está autenticado: error 400 sin firma del servidor.
+        content = pgp_server.open_upload(armored, server_priv, passphrase, client_pub)
+
+        info = {
+            "sha256": hashlib.sha256(content).hexdigest(),
+            "bytes": len(content),
+            "received_at": datetime.now(timezone.utc).isoformat(),
+            "receipt_id": receipt_id,
+        }
+
+        # Fichero auténtico pero que el servidor no acepta: rechazo firmado y cifrado.
+        rejection = rules.check_upload(content, filename)
+        if rejection:
+            code, message = rejection
+            logging.warning("Fichero rechazado por las reglas: %s", code)
+            confirmation = pgp_server.build_confirmation(
+                {"status": "REJECTED", "reason": code, "message": message, **info},
+                server_priv, passphrase, client_pub,
+            )
+            return func.HttpResponse(confirmation, status_code=422, mimetype="text/plain")
+
+        confirmation = pgp_server.build_confirmation(
+            {"status": "RECEIVED", **info}, server_priv, passphrase, client_pub
         )
         _files_container().create_item({
             "id": receipt_id,
             "filename": filename,
-            "sha256": hashlib.sha256(content).hexdigest(),
-            "bytes": len(content),
-            "received_at": datetime.now(timezone.utc).isoformat(),
+            **info,
             "ciphertext": armored,  # cifrado: solo la clave del servidor lo abre
         })
     except pgp_server.InvalidUpload as e:

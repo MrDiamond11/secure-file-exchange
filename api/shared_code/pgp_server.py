@@ -24,7 +24,7 @@ def _to_bytes(content) -> bytes:
     return content.encode("utf-8") if isinstance(content, str) else bytes(content)
 
 
-def _build_confirmation(info: dict, server_priv, passphrase: str, client_pub) -> str:
+def _sign_and_encrypt(info: dict, server_priv, passphrase: str, client_pub) -> str:
     """Firma con la privada del servidor y cifra con la pública del cliente."""
     msg = pgpy.PGPMessage.new(json.dumps(info))
     with server_priv.unlock(passphrase):
@@ -36,9 +36,8 @@ def _build_confirmation(info: dict, server_priv, passphrase: str, client_pub) ->
     return str(encrypted)
 
 
-def process_upload(armored_upload, server_priv_armored, server_passphrase,
-                   client_pub_armored, receipt_id=None):
-    """Devuelve (contenido_descifrado, confirmación_cifrada_y_firmada).
+def open_upload(armored_upload, server_priv_armored, server_passphrase, client_pub_armored) -> bytes:
+    """Descifra y verifica la firma del cliente. Devuelve el contenido en claro.
 
     Lanza InvalidUpload si no descifra o si la firma falta o no es válida.
     """
@@ -64,7 +63,20 @@ def process_upload(armored_upload, server_priv_armored, server_passphrase,
     if not bool(verification) or not any(True for _ in verification.good_signatures):
         raise InvalidUpload("Firma inválida")
 
-    content = _to_bytes(decrypted.message)
+    return _to_bytes(decrypted.message)
+
+
+def build_confirmation(info: dict, server_priv_armored, server_passphrase, client_pub_armored) -> str:
+    """Confirmación (recibido o rechazado): firmada por el servidor y cifrada para el cliente."""
+    return _sign_and_encrypt(
+        info, _load_key(server_priv_armored), server_passphrase, _load_key(client_pub_armored)
+    )
+
+
+def process_upload(armored_upload, server_priv_armored, server_passphrase,
+                   client_pub_armored, receipt_id=None):
+    """Flujo completo de aceptación: devuelve (contenido, confirmación RECEIVED)."""
+    content = open_upload(armored_upload, server_priv_armored, server_passphrase, client_pub_armored)
     info = {
         "status": "RECEIVED",
         "sha256": hashlib.sha256(content).hexdigest(),
@@ -73,5 +85,5 @@ def process_upload(armored_upload, server_priv_armored, server_passphrase,
     }
     if receipt_id:
         info["receipt_id"] = receipt_id
-    confirmation = _build_confirmation(info, server_priv, server_passphrase, client_pub)
+    confirmation = build_confirmation(info, server_priv_armored, server_passphrase, client_pub_armored)
     return content, confirmation
